@@ -39,6 +39,31 @@ Open a new shell (or `source ~/.bash_profile`) and verify:
 devenv templates
 ```
 
+### GitHub authentication
+
+`devenv` clones your project repos into each container over HTTPS using `GIT_TOKEN`. Create a
+token at GitHub → **Settings → Developer settings → Personal access tokens**:
+
+- **Fine-grained** (recommended): limit repository access to the repos you'll clone;
+  **Contents: Read-only** (or Read/write if you'll push from inside containers).
+- or a **classic** token with the `repo` scope.
+
+Set it as `GIT_TOKEN`. It is injected at container runtime via a git credential helper and is
+**never written into any repo's `.git/config`** on disk.
+
+For `GIT_USER_EMAIL`, prefer your GitHub **noreply address**
+(`<id>+<username>@users.noreply.github.com`, shown under Settings → Emails when *"Keep my email
+addresses private"* is enabled) so commits made inside containers don't expose your real email.
+Set the same identity on the host for commits you make outside containers:
+
+```bash
+git config --global user.name  "<username>"
+git config --global user.email "<id>+<username>@users.noreply.github.com"
+```
+
+> Pushing to *this* repo can use either a PAT over HTTPS or an SSH key — that's independent of
+> `GIT_TOKEN`, which only governs cloning your project repos into containers.
+
 ---
 
 ## Repository structure
