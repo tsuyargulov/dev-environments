@@ -41,28 +41,27 @@ devenv templates
 
 ### GitHub authentication
 
-`devenv` clones your project repos into each container over HTTPS using `GIT_TOKEN`. Create a
-token at GitHub → **Settings → Developer settings → Personal access tokens**:
+`GIT_TOKEN` is used **when a devcontainer is created**. On first start, the container fetches your
+project repo into `/workspace` — cloned over HTTPS, authenticated with `GIT_TOKEN` supplied by a
+git credential helper, so the token is **never written to disk** (not in the clone URL, not in
+`.git/config`).
+
+Create the token at GitHub → **Settings → Developer settings → Personal access tokens**, then set
+it as `GIT_TOKEN`:
 
 - **Fine-grained** (recommended): limit repository access to the repos you'll clone;
-  **Contents: Read-only** (or Read/write if you'll push from inside containers).
+  **Contents: Read-only** (or Read/write if you'll also push from inside containers).
 - or a **classic** token with the `repo` scope.
 
-Set it as `GIT_TOKEN`. It is injected at container runtime via a git credential helper and is
-**never written into any repo's `.git/config`** on disk.
+`GIT_USER_NAME` / `GIT_USER_EMAIL` set the identity for commits made *inside* containers. For the
+email, prefer your GitHub **noreply address** (`<id>+<username>@users.noreply.github.com`, shown
+under Settings → Emails when *"Keep my email addresses private"* is enabled) so those commits
+don't expose your real address.
 
-For `GIT_USER_EMAIL`, prefer your GitHub **noreply address**
-(`<id>+<username>@users.noreply.github.com`, shown under Settings → Emails when *"Keep my email
-addresses private"* is enabled) so commits made inside containers don't expose your real email.
-Set the same identity on the host for commits you make outside containers:
-
-```bash
-git config --global user.name  "<username>"
-git config --global user.email "<id>+<username>@users.noreply.github.com"
-```
-
-> Pushing to *this* repo can use either a PAT over HTTPS or an SSH key — that's independent of
-> `GIT_TOKEN`, which only governs cloning your project repos into containers.
+> **Different from publishing your own code.** Pushing commits to a Git host — e.g. committing a
+> project to your own repo — is *host-side* git auth (a PAT over HTTPS or an SSH key, plus your
+> host `git config` identity). That does **not** use `GIT_TOKEN`; `GIT_TOKEN` only governs
+> fetching project repos into containers at creation time.
 
 ---
 
