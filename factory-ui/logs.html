@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>logs · devenv factory</title>
+<style>
+  :root {
+    --bg:#0f1215; --surface:#15191e; --ink:#dfe4ea; --ink-faint:#7d8794;
+    --line:#262c33; --accent:#e8710a; --accent-ink:#f3902f;
+    --live:#4fb2a5; --danger:#d1687a;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--ink); font-family:var(--sans); display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:.7rem; padding:.7rem 1rem; border-bottom:1px solid var(--line);
+    border-top:3px solid var(--accent); background:var(--surface); flex:none; }
+  header .title { font-weight:600; font-size:.95rem; }
+  header .title .proj { color:var(--accent-ink); font-family:var(--mono); }
+  header .action { font-family:var(--mono); font-size:.72rem; color:var(--ink-faint); }
+  .state { margin-left:auto; font-family:var(--mono); font-size:.72rem; padding:.2rem .6rem; border-radius:20px;
+    display:inline-flex; align-items:center; gap:.4rem; border:1px solid var(--line); }
+  .state::before { content:""; width:.5rem; height:.5rem; border-radius:50%; background:var(--accent); }
+  .state.running::before { animation:pulse 1s infinite; }
+  .state.done { color:var(--live); } .state.done::before { background:var(--live); }
+  .state.error { color:var(--danger); } .state.error::before { background:var(--danger); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  pre { flex:1; margin:0; padding:1rem 1.1rem; overflow:auto; font-family:var(--mono);
+    font-size:.8rem; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+  .hint { color:var(--ink-faint); }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="title"><span class="proj" id="proj">…</span></div>
+      <div class="action" id="action">connecting…</div>
+    </div>
+    <span class="state running" id="state">running</span>
+  </header>
+  <pre id="log"><span class="hint">Waiting for output…</span></pre>
+
+<script>
+  const name = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop() || "");
+  document.getElementById("proj").textContent = name;
+  document.title = `${name} · logs`;
+  const pre = document.getElementById("log");
+  const stateEl = document.getElementById("state");
+  const actionEl = document.getElementById("action");
+
+  let started = false;
+  function atBottom() { return pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40; }
+
+  const es = new EventSource(`/api/projects/${encodeURIComponent(name)}/logs`);
+
+  es.onopen = () => { pre.textContent = ""; started = false; actionEl.textContent = "streaming"; };
+
+  es.onmessage = (ev) => {
+    if (!started) { pre.textContent = ""; started = true; }
+    const stick = atBottom();
+    pre.appendChild(document.createTextNode(ev.data + "\n"));
+    if (stick) pre.scrollTop = pre.scrollHeight;
+  };
+
+  es.addEventListener("end", (ev) => {
+    es.close();
+    const st = ev.data;
+    if (st === "none") {
+      stateEl.textContent = "no active build";
+      stateEl.className = "state";
+      actionEl.textContent = "nothing running for this project";
+      if (!started) pre.innerHTML = '<span class="hint">No build has run for this project in the current session.</span>';
+    } else {
+      stateEl.textContent = st;
+      stateEl.className = "state " + st;
+      actionEl.textContent = st === "done" ? "finished" : "failed";
+    }
+  });
+
+  es.onerror = () => { actionEl.textContent = "connection lost — retrying…"; };
+</script>
+</body>
+</html>

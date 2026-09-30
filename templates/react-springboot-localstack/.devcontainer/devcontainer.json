@@ -1,0 +1,51 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "SSH_PUBKEY": "{{SSH_PUBKEY}}"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "jdkDistro": "zulu",
+      "installGradle": true,
+      "gradleVersion": "latest"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "mounts": [
+    "source={{PROJECT_DIR}},target=/workspace,type=bind,consistency=cached"
+  ],
+  "appPort": ["{{SSH_PORT}}:22"],
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspace",
+  "postStartCommand": "sudo ssh-keygen -A && sudo /usr/sbin/sshd && git config --global credential.helper '!f() { echo username=git; echo password=$GIT_TOKEN; }; f' && git config --global user.email \"$GIT_USER_EMAIL\" && git config --global user.name \"$GIT_USER_NAME\" && [ -z \"$(ls -A /workspace)\" ] && git clone ${GIT_BRANCH:+--branch $GIT_BRANCH} \"$GIT_REPO\" /workspace || true",
+  "remoteEnv": {
+    "GIT_REPO": "{{GIT_REPO}}",
+    "GIT_BRANCH": "{{GIT_BRANCH}}",
+    "GIT_TOKEN": "${localEnv:GIT_TOKEN}",
+    "GIT_USER_EMAIL": "${localEnv:GIT_USER_EMAIL}",
+    "GIT_USER_NAME": "${localEnv:GIT_USER_NAME}",
+    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566",
+    "AWS_ACCESS_KEY_ID": "test",
+    "AWS_SECRET_ACCESS_KEY": "test",
+    "AWS_DEFAULT_REGION": "us-east-1"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-gradle",
+        "vmware.vscode-boot-dev-pack",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}

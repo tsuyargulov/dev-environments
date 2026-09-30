@@ -1,0 +1,47 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "SSH_PUBKEY": "{{SSH_PUBKEY}}"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "mounts": [
+    "source={{PROJECT_DIR}},target=/workspace,type=bind,consistency=cached"
+  ],
+  "appPort": ["{{SSH_PORT}}:22"],
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspace",
+  "postCreateCommand": "git config --global credential.helper '!f() { echo username=git; echo password=$GIT_TOKEN; }; f' && git config --global user.email \"$GIT_USER_EMAIL\" && git config --global user.name \"$GIT_USER_NAME\"; if [ -z \"$(ls -A /workspace)\" ]; then git clone ${GIT_BRANCH:+--branch $GIT_BRANCH} \"$GIT_REPO\" /workspace; fi; cd /workspace && { if [ -f pyproject.toml ]; then uv sync; elif [ -f requirements.txt ]; then uv venv && uv pip install -r requirements.txt; fi; } || echo 'devenv: dependency install failed — run uv sync in /workspace to see the error'",
+  "postStartCommand": "sudo ssh-keygen -A && sudo /usr/sbin/sshd",
+  "containerEnv": {
+    "UV_LINK_MODE": "copy"
+  },
+  "remoteEnv": {
+    "GIT_REPO": "{{GIT_REPO}}",
+    "GIT_BRANCH": "{{GIT_BRANCH}}",
+    "GIT_TOKEN": "${localEnv:GIT_TOKEN}",
+    "GIT_USER_EMAIL": "${localEnv:GIT_USER_EMAIL}",
+    "GIT_USER_NAME": "${localEnv:GIT_USER_NAME}"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.black-formatter",
+        "batisteo.vscode-django",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}

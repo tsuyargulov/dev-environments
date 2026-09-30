@@ -1,0 +1,261 @@
+#!/bin/bash
+set -euo pipefail
+
+DEVENV_HOME="${DEVENV_HOME:-$HOME/.devenv}"
+TEMPLATES_DIR="$DEVENV_HOME/templates"
+PROJECTS_DIR="$DEVENV_HOME/projects"
+WORKSPACES_DIR="${DEVENV_WORKSPACES:-$HOME/dev}"
+
+# ── helpers ────────────────────────────────────────────────────────────────
+
+die()  { echo "error: $*" >&2; exit 1; }
+info() { echo "▸ $*"; }
+
+require() {
+  for cmd in "$@"; do
+    command -v "$cmd" &>/dev/null || die "'$cmd' not found — install it first"
+  done
+}
+
+project_cfg()   { echo "$PROJECTS_DIR/$1/config.env"; }
+project_secrets() { echo "$PROJECTS_DIR/$1/secrets.env"; }
+workspace_dir() { echo "$WORKSPACES_DIR/$1"; }
+
+load_config() {
+  local cfg
+  cfg=$(project_cfg "$1")
+  [[ -f "$cfg" ]] || die "project '$1' not found (looked in $cfg)"
+  # shellcheck source=/dev/null
+  set -a; source "$cfg"; set +a
+}
+
+# ── ssh config ─────────────────────────────────────────────────────────────
+
+ssh_config_add() {
+  local name=$1 port=$2
+  ssh_config_remove "$name"
+  cat >> "$HOME/.ssh/config" <<EOF
+
+# devenv:$name
+Host $name
+    HostName localhost
+    User vscode
+    Port $port
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+EOF
+  info "~/.ssh/config: added Host $name → port $port"
+}
+
+ssh_config_remove() {
+  local name=$1
+  local tmp
+  tmp=$(mktemp)
+  awk "/^# devenv:$name$/{found=1} found && /^$/{found=0; next} !found" \
+    "$HOME/.ssh/config" > "$tmp" 2>/dev/null || true
+  mv "$tmp" "$HOME/.ssh/config"
+}
+
+# ── port management ────────────────────────────────────────────────────────
+
+next_free_port() {
+  local port=2222
+  while grep -q "Port $port" "$HOME/.ssh/config" 2>/dev/null; do
+    ((port++))
+  done
+  echo "$port"
+}
+
+# ── commands ───────────────────────────────────────────────────────────────
+
+cmd_new() {
+  local project="" template=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --template|-t) template="$2"; shift 2 ;;
+      *) project="$1"; shift ;;
+    esac
+  done
+
+  [[ -n "$project" ]]  || die "usage: devenv new <project> --template <template>"
+  [[ -n "$template" ]] || die "usage: devenv new <project> --template <template>"
+
+  local tmpl_dir="$TEMPLATES_DIR/$template"
+  [[ -d "$tmpl_dir" ]] || die "template '$template' not found — available: $(ls "$TEMPLATES_DIR")"
+
+  local proj_cfg
+  proj_cfg=$(project_cfg "$project")
+  [[ -f "$proj_cfg" ]] && die "project '$project' already exists"
+
+  local workspace
+  workspace=$(workspace_dir "$project")
+  [[ -d "$workspace" ]] && die "workspace '$workspace' already exists"
+
+  read -rp "Git repo URL: " git_repo
+  [[ -n "$git_repo" ]] || die "git repo URL required"
+
+  read -rp "Branch (leave empty for default): " git_branch
+  if [[ -n "$git_branch" ]]; then
+    # verify branch exists on remote using token-authenticated URL
+    local auth_repo
+    auth_repo="https://${GIT_TOKEN}@$(echo "$git_repo" | sed 's|https://||')"
+    git ls-remote --exit-code --heads "$auth_repo" "$git_branch" &>/dev/null \
+      || die "branch '$git_branch' not found on remote"
+  fi
+
+  local port
+  port=$(next_free_port)
+
+  # copy public key for SSH auth inside container
+  local pubkey=""
+  for keyfile in "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/id_rsa.pub"; do
+    [[ -f "$keyfile" ]] && { pubkey=$(cat "$keyfile"); break; }
+  done
+  [[ -n "$pubkey" ]] || die "no SSH public key found in ~/.ssh/ — run: ssh-keygen"
+
+  local project_dir="$HOME/projects/$project"
+
+  # scaffold workspace (devcontainer config)
+  mkdir -p "$workspace/.devcontainer"
+  cp -r "$tmpl_dir/.devcontainer/." "$workspace/.devcontainer/"
+
+  # create host project dir (bind-mounted into container as /workspace)
+  mkdir -p "$project_dir"
+
+  # substitute placeholders
+  find "$workspace/.devcontainer" -type f | while read -r f; do
+    sed \
+      -e "s|{{PROJECT_NAME}}|$project|g" \
+      -e "s|{{GIT_REPO}}|$git_repo|g" \
+      -e "s|{{GIT_BRANCH}}|$git_branch|g" \
+      -e "s|{{SSH_PORT}}|$port|g" \
+      -e "s|{{SSH_PUBKEY}}|$pubkey|g" \
+      -e "s|{{PROJECT_DIR}}|$project_dir|g" \
+      "$f" > "${f}.tmp" && mv "${f}.tmp" "$f"
+  done
+
+  # write config
+  mkdir -p "$PROJECTS_DIR/$project"
+  cat > "$proj_cfg" <<EOF
+PROJECT_NAME=$project
+GIT_REPO=$git_repo
+GIT_BRANCH=$git_branch
+SSH_PORT=$port
+TEMPLATE=$template
+WORKSPACE=$workspace
+PROJECT_DIR=$project_dir
+SSH_PUBKEY="$pubkey"
+EOF
+
+  touch "$(project_secrets "$project")"
+
+  echo
+  info "Created project '$project'"
+  echo "  template : $template"
+  echo "  workspace: $workspace"
+  echo "  ssh port : $port"
+  echo
+  echo "Add secrets: $PROJECTS_DIR/$project/secrets.env"
+  echo "Then run:    devenv start $project"
+}
+
+cmd_start() {
+  local project="${1:-}"
+  [[ -n "$project" ]] || die "usage: devenv start <project>"
+  load_config "$project"
+
+  require devcontainer
+
+  info "Starting '$project'..."
+
+  devcontainer up \
+    --workspace-folder "$WORKSPACE" \
+    --log-format text
+
+  ssh_config_add "$project" "$SSH_PORT"
+
+  echo
+  info "Ready."
+  echo "  ssh $project"
+  echo "  IDEA → Remote Development → SSH → $project"
+}
+
+cmd_stop() {
+  local project="${1:-}"
+  [[ -n "$project" ]] || die "usage: devenv stop <project>"
+  load_config "$project"
+
+  # find container by devcontainer label
+  local container
+  container=$(docker ps -q --filter "label=devcontainer.local_folder=$WORKSPACE" | head -1 || true)
+
+  if [[ -n "$container" ]]; then
+    docker stop "$container" && docker rm "$container"
+    info "Stopped container '$container'"
+  else
+    info "No running container found for '$project'"
+  fi
+
+  ssh_config_remove "$project"
+  info "Removed SSH config entry for '$project'"
+}
+
+cmd_ssh() {
+  local project="${1:-}"
+  [[ -n "$project" ]] || die "usage: devenv ssh <project>"
+  load_config "$project"
+  exec ssh "$project"
+}
+
+cmd_list() {
+  printf "%-22s %-8s %-10s %s\n" "PROJECT" "PORT" "STATUS" "TEMPLATE"
+  printf "%-22s %-8s %-10s %s\n" "───────────────────" "────" "──────" "────────"
+
+  local found=0
+  for cfg in "$PROJECTS_DIR"/*/config.env; do
+    [[ -f "$cfg" ]] || continue
+    found=1
+    unset PROJECT_NAME SSH_PORT TEMPLATE
+    # shellcheck source=/dev/null
+    set -a; source "$cfg"; set +a
+    local status="stopped"
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -q "$PROJECT_NAME" && status="running"
+    printf "%-22s %-8s %-10s %s\n" "$PROJECT_NAME" "$SSH_PORT" "$status" "$TEMPLATE"
+  done
+
+  [[ $found -eq 0 ]] && echo "(no projects — run: devenv new <project> --template <template>)"
+}
+
+cmd_templates() {
+  echo "Available templates:"
+  for t in "$TEMPLATES_DIR"/*/; do
+    [[ -d "$t" ]] && echo "  $(basename "$t")"
+  done
+}
+
+# ── main ───────────────────────────────────────────────────────────────────
+
+require docker
+
+case "${1:-}" in
+  new)       shift; cmd_new "$@" ;;
+  start)     shift; cmd_start "${1:-}" ;;
+  stop)      shift; cmd_stop "${1:-}" ;;
+  ssh)       shift; cmd_ssh "${1:-}" ;;
+  list)      cmd_list ;;
+  templates) cmd_templates ;;
+  *)
+    cat <<'USAGE'
+Usage: devenv <command> [args]
+
+Commands:
+  new <project> --template <t>   scaffold a new project from a template
+  start <project>                build and start the dev container
+  stop <project>                 stop and remove the container
+  ssh <project>                  open an SSH session
+  list                           show all projects and their status
+  templates                      list available templates
+USAGE
+    ;;
+esac

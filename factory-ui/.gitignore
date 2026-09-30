@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+# contains the Keycloak client secret — never commit
+auth_config.json
+# session signing key
+.flask_secret
