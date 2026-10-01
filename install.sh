@@ -21,6 +21,12 @@ case "${SHELL##*/}" in
 esac
 say "Using shell profile: $PROFILE"
 
+# Make Homebrew-installed tools (node, etc.) visible even if this shell hasn't re-sourced the
+# profile yet — e.g. running install.sh right after bootstrap.sh in the same shell.
+for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+  [ -x "$b" ] && eval "$("$b" shellenv)" && break
+done
+
 # --- prerequisites ----------------------------------------------------------
 say "Checking prerequisites…"
 

@@ -80,4 +80,5 @@ echo "         (fine-grained, Contents: Read). You'll set it as GIT_TOKEN after 
 
 echo
 ok "Prerequisites done."
-echo "  Next:  cd $SCRIPT_DIR && ./install.sh"
+echo "  Next — open a NEW shell so Homebrew is on PATH (or: source $PROFILE), then:"
+echo "    cd $SCRIPT_DIR && ./install.sh"

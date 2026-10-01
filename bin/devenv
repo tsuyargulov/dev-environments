@@ -97,11 +97,15 @@ cmd_new() {
 
   read -rp "Branch (leave empty for default): " git_branch
   if [[ -n "$git_branch" ]]; then
-    # verify branch exists on remote using token-authenticated URL
-    local auth_repo
-    auth_repo="https://${GIT_TOKEN}@$(echo "$git_repo" | sed 's|https://||')"
-    git ls-remote --exit-code --heads "$auth_repo" "$git_branch" &>/dev/null \
-      || die "branch '$git_branch' not found on remote"
+    # Verify the branch exists on the remote. Use a token-authenticated URL only if
+    # GIT_TOKEN is set (needed for private repos); otherwise check the plain URL, which
+    # works for public repos. ${GIT_TOKEN:-} keeps this safe under `set -u`.
+    local check_repo="$git_repo"
+    if [[ -n "${GIT_TOKEN:-}" ]]; then
+      check_repo="https://${GIT_TOKEN}@$(echo "$git_repo" | sed 's|https://||')"
+    fi
+    git ls-remote --exit-code --heads "$check_repo" "$git_branch" &>/dev/null \
+      || die "branch '$git_branch' not found on remote (private repo? set GIT_TOKEN)"
   fi
 
   local port
