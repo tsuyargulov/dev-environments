@@ -24,6 +24,9 @@ cd ~/.devenv
 ./install.sh
 ```
 
+> **Brand-new Mac?** If Homebrew / Node / Docker aren't installed yet, run the one-time
+> `./bootstrap.sh` *before* `install.sh` — see [New machine](#new-machine-from-a-factory-fresh-mac).
+
 `install.sh` checks prerequisites, installs `@devcontainers/cli`, adds `devenv` to your `PATH`,
 and scaffolds the host environment variables you need to fill in:
 
@@ -181,6 +184,37 @@ It runs on the host (it needs Docker and the `~/.devenv` tree) alongside Keycloa
 as sibling containers. See **[factory-ui/README.md](factory-ui/README.md)** to run it.
 
 ---
+
+## New machine (from a factory-fresh Mac)
+
+The uncommon path — a Mac with no Homebrew / Node / Docker yet. `bootstrap.sh` installs the
+OS-level prerequisites; day-to-day you only need `install.sh`.
+
+```bash
+# 1. Command Line Tools (gives you git) — accept the dialog it opens
+xcode-select --install
+
+# 2. Clone (public repo — no auth needed)
+git clone https://github.com/tsuyargulov/dev-environments.git ~/.devenv
+cd ~/.devenv
+
+# 3. Prerequisites: Homebrew, Node, Docker Desktop, an SSH key
+./bootstrap.sh
+#    then in Docker Desktop: accept terms + set Settings → Resources → Memory
+
+# 4. Install the tool
+./install.sh
+
+# 5. Create a GitHub PAT and set GIT_TOKEN / GIT_USER_* in your shell profile
+#    (the install output shows the exact lines)
+
+# 6. New shell, then verify + first project
+devenv templates
+devenv new demo --template python && devenv start demo && ssh demo
+```
+
+A fresh Mac defaults to **zsh**, so the scripts write `~/.zshrc`; this is auto-detected. To match
+a bash setup instead, run `chsh -s /bin/bash` before step 3.
 
 ## Uninstall
 
