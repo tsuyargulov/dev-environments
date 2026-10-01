@@ -1,0 +1,12 @@
+# Lint bar for the factory UI Python code.
+#
+# ruff's current defaults flag several intentional best-effort patterns in app.py —
+# blind `except Exception` fallbacks (BLE001), silent `try/except/pass` (S110), and
+# `subprocess.run` without `check=` where the return code is inspected manually (PLW1510).
+# The bar below keeps the genuine correctness checks (pyflakes F, pycodestyle E4/E7/E9)
+# plus import ordering (I), and omits those opinionated rules. E5 (line length) is left
+# off deliberately.
+line-length = 100
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I"]

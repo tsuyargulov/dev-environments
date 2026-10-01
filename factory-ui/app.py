@@ -8,21 +8,21 @@ Auth: OIDC Authorization Code flow against Keycloak. A separate /login page gate
 the factory panel. After sign-in, the STS panel exchanges the Keycloak ID token for
 temporary credentials via assume-role-with-web-identity (LocalStack). Stdlib only.
 """
+import base64
+import json
 import os
 import re
-import json
-import base64
-import shutil
 import secrets
+import shutil
 import subprocess
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
-import urllib.error
 from pathlib import Path
 
-from flask import Flask, jsonify, request, session, redirect, send_from_directory, Response
+from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session
 
 HOME = Path.home()
 DEVENV_HOME = Path(os.environ.get("DEVENV_HOME", HOME / ".devenv"))
