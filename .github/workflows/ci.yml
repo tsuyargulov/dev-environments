@@ -1,0 +1,133 @@
+name: CI
+
+# MANUAL ONLY for now — no push/PR/schedule triggers. Run it from the Actions tab via
+# "Run workflow", choosing a scope:
+#   lint-and-build  (default) — static checks + build each template image (fast, no containers run)
+#   up-and-exec               — start each template, clone into /workspace, assert a feature runs
+#   all                       — everything
+#
+# When ready for automation later, add e.g.:
+#   push: { branches: [dev, main] }
+#   pull_request:
+#   schedule: [ { cron: "0 3 * * *" } ]
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "What to run"
+        type: choice
+        default: lint-and-build
+        options:
+          - lint-and-build
+          - up-and-exec
+          - all
+
+jobs:
+  lint:
+    if: github.event.inputs.scope == 'lint-and-build' || github.event.inputs.scope == 'all'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck
+        run: shellcheck --severity=error bin/devenv install.sh uninstall.sh bootstrap.sh factory-ui/setup_keycloak.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python lint (ruff)
+        run: |
+          pip install --quiet ruff
+          ruff check factory-ui/
+      - name: Python format check (black) — advisory
+        continue-on-error: true
+        run: |
+          pip install --quiet black
+          black --check --diff factory-ui/
+      - name: Dockerfile lint (hadolint)
+        run: |
+          for df in templates/*/.devcontainer/Dockerfile; do
+            echo "::group::hadolint $df"
+            docker run --rm -i hadolint/hadolint hadolint --failure-threshold error - < "$df"
+            echo "::endgroup::"
+          done
+      - name: devcontainer.json is valid JSON
+        run: |
+          for f in templates/*/.devcontainer/devcontainer.json; do
+            jq empty "$f" && echo "ok: $f"
+          done
+
+  build-templates:
+    if: github.event.inputs.scope == 'lint-and-build' || github.event.inputs.scope == 'all'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [python, python314-aws, django-bff, terraform-aws, java21-gradle, react-springboot-localstack]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - run: npm install -g @devcontainers/cli
+      - name: Prepare workspace from template
+        run: |
+          set -euo pipefail
+          WS="$RUNNER_TEMP/ws"; mkdir -p "$WS" /tmp/citest
+          cp -R "templates/${{ matrix.template }}/." "$WS/"
+          ssh-keygen -t ed25519 -f "$RUNNER_TEMP/k" -N "" -C ci >/dev/null
+          PUB="$(cat "$RUNNER_TEMP/k.pub")"
+          sed -i \
+            -e "s|{{PROJECT_NAME}}|citest|g" \
+            -e "s|{{GIT_REPO}}|https://github.com/tsuyargulov/dev-environments.git|g" \
+            -e "s|{{GIT_BRANCH}}||g" \
+            -e "s|{{SSH_PORT}}|2222|g" \
+            -e "s|{{PROJECT_DIR}}|/tmp/citest|g" \
+            -e "s|{{SSH_PUBKEY}}|$PUB|g" \
+            "$WS/.devcontainer/devcontainer.json"
+          echo "::group::devcontainer.json"; cat "$WS/.devcontainer/devcontainer.json"; echo "::endgroup::"
+      - name: Build image (no containers run; validates base + features + Dockerfile)
+        run: devcontainer build --workspace-folder "$RUNNER_TEMP/ws"
+
+  up-exec:
+    if: github.event.inputs.scope == 'up-and-exec' || github.event.inputs.scope == 'all'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [python, python314-aws, django-bff, terraform-aws, java21-gradle, react-springboot-localstack]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - run: npm install -g @devcontainers/cli
+      - name: Prepare workspace from template
+        run: |
+          set -euo pipefail
+          WS="$RUNNER_TEMP/ws"; mkdir -p "$WS" /tmp/citest
+          cp -R "templates/${{ matrix.template }}/." "$WS/"
+          ssh-keygen -t ed25519 -f "$RUNNER_TEMP/k" -N "" -C ci >/dev/null
+          PUB="$(cat "$RUNNER_TEMP/k.pub")"
+          sed -i \
+            -e "s|{{PROJECT_NAME}}|citest|g" \
+            -e "s|{{GIT_REPO}}|https://github.com/tsuyargulov/dev-environments.git|g" \
+            -e "s|{{GIT_BRANCH}}||g" \
+            -e "s|{{SSH_PORT}}|2222|g" \
+            -e "s|{{PROJECT_DIR}}|/tmp/citest|g" \
+            -e "s|{{SSH_PUBKEY}}|$PUB|g" \
+            "$WS/.devcontainer/devcontainer.json"
+      - name: Up (starts container + runs lifecycle → clones public repo into /workspace, token-free)
+        run: devcontainer up --workspace-folder "$RUNNER_TEMP/ws"
+      - name: Exec — assert /workspace populated and a feature runs
+        run: |
+          WS="$RUNNER_TEMP/ws"
+          devcontainer exec --workspace-folder "$WS" bash -lc \
+            'test -n "$(ls -A /workspace)" && echo "workspace populated: $(ls -A /workspace | wc -l) entries" || { echo "workspace EMPTY"; exit 1; }'
+          case "${{ matrix.template }}" in
+            python|python314-aws)          CMD='python --version' ;;
+            django-bff)                    CMD='python --version; node --version' ;;
+            terraform-aws)                 CMD='terraform version' ;;
+            java21-gradle)                 CMD='java -version' ;;
+            react-springboot-localstack)  CMD='java -version; node --version' ;;
+          esac
+          devcontainer exec --workspace-folder "$WS" bash -lc "$CMD"
