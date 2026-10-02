@@ -1,0 +1,3 @@
+# generated locally, never commit
+.env
+keys/

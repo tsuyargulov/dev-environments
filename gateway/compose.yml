@@ -1,0 +1,57 @@
+name: devenv-gateway
+
+# Increment 1: sshpiper + ONE throwaway target, to validate routing on this host before
+# touching devenv/templates. A real devcontainer replaces `test-target` in later increments.
+#
+# Security posture: sshpiper NEVER touches the raw docker socket. A scoped docker-socket-proxy
+# holds the socket and exposes ONLY read-only container listing to sshpiper over an internal TCP
+# API — so a sshpiper compromise can't create/exec containers (no host-root escape), and sshpiper
+# runs non-root. (The raw-socket power now concentrates in the tiny, non-exposed proxy. The real
+# fix for "socket = host root" is rootless Docker/Podman or K8s RBAC — see roadmap.)
+
+networks:
+  devenv-net:
+    name: devenv-net
+
+services:
+  # Holds the real socket; allows ONLY GET /containers/* (CONTAINERS=1). POST denied by default,
+  # so no container create/exec/start. Internal only — no published port.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    environment:
+      CONTAINERS: "1"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [devenv-net]
+    restart: unless-stopped
+
+  sshpiper:
+    image: ghcr.io/tg123/sshpiperd:full-v1.5.3   # "full" variant bundles the docker plugin
+    command: ["/sshpiperd/plugins/docker"]       # plugin binary isn't on PATH → full path
+    # (image ENTRYPOINT is /sshpiperd/sshpiperd, so this runs: sshpiperd /sshpiperd/plugins/docker)
+    environment:
+      DOCKER_HOST: tcp://docker-socket-proxy:2375   # query the scoped proxy, NOT the raw socket
+    depends_on: [docker-socket-proxy]
+    ports:
+      - "2200:2222"                      # host :2200  ->  sshpiper :2222
+    networks: [devenv-net]
+    restart: unless-stopped
+
+  # Throwaway target — VALIDATION ONLY, not started by `devenv gateway up`.
+  # Re-run the routing check with:  ./setup.sh && docker compose --profile validation up -d
+  # Real devcontainers (labelled + routed by devenv) replace this in increment 2b.
+  test-target:
+    profiles: ["validation"]
+    image: lscr.io/linuxserver/openssh-server:latest
+    environment:
+      USER_NAME: vscode
+      PUBLIC_KEY: ${GATEWAY_PUBKEY:-}      # container trusts sshpiper's upstream key
+      SUDO_ACCESS: "false"
+    labels:
+      sshpiper.username: "test"                        # route key: ssh test@host:2200
+      sshpiper.container_username: "vscode"
+      sshpiper.port: "2222"                            # linuxserver sshd port
+      sshpiper.authorized_keys: ${USER_PUBKEY_B64:-}   # sshpiper verifies YOU (downstream)
+      sshpiper.private_key: ${GATEWAY_PRIVKEY_B64:-}   # sshpiper authenticates upstream
+    networks: [devenv-net]
+    restart: unless-stopped
