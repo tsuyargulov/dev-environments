@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Qbank · devenv factory</title>
+<title>devenv factory</title>
 <style>
   :root {
     --bg:#14171b; --surface:#1d2126; --surface-2:#23282e;
@@ -100,7 +100,7 @@
 <div class="wrap">
   <header>
     <div class="brand">
-      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Qbank">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="devenv factory">
         <circle cx="50" cy="50" r="47" fill="#E8710A"/>
         <circle cx="50" cy="50" r="40" fill="#FFFFFF"/>
         <circle cx="50" cy="50" r="37" fill="#FFB35C"/>
@@ -112,7 +112,7 @@
         </g>
         <circle cx="50" cy="50" r="4.5" fill="#FFFFFF"/>
       </svg>
-      <h1><span class="q">Qbank</span><span class="sep">·</span>devenv factory</h1>
+      <h1><span class="q">devenv</span> factory</h1>
     </div>
     <div class="whoami">
       <span id="whoami-user"></span>
@@ -127,7 +127,7 @@
   <div class="card">
     <table>
       <thead>
-        <tr><th>Project</th><th>Template</th><th>Port</th><th>Branch</th><th>Status</th><th></th></tr>
+        <tr><th>Project</th><th>Template</th><th>Branch</th><th>Status</th><th></th></tr>
       </thead>
       <tbody id="projects"></tbody>
     </table>
@@ -221,7 +221,7 @@ function renderFactory(state) {
   if (cur) sel.value = cur;
   const tb = $("#projects");
   if (!state.projects.length) {
-    tb.innerHTML = `<tr><td colspan="6" class="empty">No projects yet — create one below.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="5" class="empty">No projects yet — create one below.</td></tr>`;
     return;
   }
   tb.innerHTML = state.projects.map(p => {
@@ -235,7 +235,6 @@ function renderFactory(state) {
     return `<tr>
       <td><div class="name">${p.name}</div>${ssh}</td>
       <td class="meta">${p.template}</td>
-      <td class="meta">${p.port}</td>
       <td class="meta">${p.branch || "—"}</td>
       <td>${pill(p)}${logs}</td>
       <td><div class="actions">${startStop}</div></td>

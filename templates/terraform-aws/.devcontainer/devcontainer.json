@@ -3,7 +3,7 @@
   "build": {
     "dockerfile": "Dockerfile",
     "args": {
-      "SSH_PUBKEY": "{{SSH_PUBKEY}}"
+      "SSH_PUBKEY": "{{GATEWAY_PUBKEY}}"
     }
   },
   "features": {
@@ -21,9 +21,16 @@
   "mounts": [
     "source={{PROJECT_DIR}},target=/workspace,type=bind,consistency=cached"
   ],
-  "appPort": ["{{SSH_PORT}}:22"],
   "remoteUser": "vscode",
   "workspaceFolder": "/workspace",
+  "runArgs": [
+    "--network", "devenv-net",
+    "--label", "sshpiper.username={{PROJECT_NAME}}",
+    "--label", "sshpiper.container_username=vscode",
+    "--label", "sshpiper.port=22",
+    "--label", "sshpiper.authorized_keys={{USER_PUBKEY_B64}}",
+    "--label", "sshpiper.private_key={{GATEWAY_PRIVKEY_B64}}"
+  ],
   "postCreateCommand": "python -m pip install --no-cache-dir awscli-local terraform-local",
   "postStartCommand": "sudo ssh-keygen -A && sudo /usr/sbin/sshd && git config --global credential.helper '!f() { echo username=git; echo password=$GIT_TOKEN; }; f' && git config --global user.email \"$GIT_USER_EMAIL\" && git config --global user.name \"$GIT_USER_NAME\" && [ -z \"$(ls -A /workspace)\" ] && git clone ${GIT_BRANCH:+--branch $GIT_BRANCH} \"$GIT_REPO\" /workspace || true",
   "remoteEnv": {

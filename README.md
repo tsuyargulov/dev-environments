@@ -90,8 +90,7 @@ dev-environments/
 
 | Path | What |
 |------|------|
-| `~/.devenv/projects/<p>/config.env` | per-project config (port, repo, workspace) |
-| `~/.devenv/projects/<p>/secrets.env` | tokens (never committed) |
+| `~/.devenv/projects/<p>/config.env` | per-project config (repo, branch, workspace) |
 | `~/dev/<p>/` | generated devcontainer config |
 | `~/projects/<p>/` | the bind-mounted workspace (your cloned repo) |
 
@@ -107,6 +106,24 @@ dev-environments/
 | `devenv ssh <project>` | open an SSH session (lands in `/workspace`) |
 | `devenv list` | list projects and running status |
 | `devenv templates` | list available templates |
+| `devenv gateway {up\|down\|status}` | manage the single-port SSH gateway |
+
+---
+
+## SSH gateway (single port)
+
+All devcontainers are reached through one SSH reverse proxy (sshpiper) on **`localhost:2200`**
+that routes by **username** — `ssh <project>` logs you into that project's container, so there
+are no per-container ports. Start it once (or let `devenv start` bring it up):
+
+```bash
+devenv gateway up        # start the gateway
+devenv gateway status
+devenv gateway down
+```
+
+Security: the gateway reaches containers through a read-only docker-socket-proxy — it never gets
+the raw Docker socket or runs as root. See [gateway/README.md](gateway/README.md).
 
 ---
 
@@ -121,8 +138,8 @@ devenv start myapi          # builds the image, clones your repo into /workspace
 ssh myapi                   # you're now inside the container, in /workspace
 ```
 
-`devenv new` auto-assigns a free SSH port and writes a `~/.ssh/config` alias, so you connect by
-**name** (`ssh myapi`) — never a port number.
+`devenv start` writes a `~/.ssh/config` alias pointing at the gateway, so you connect by
+**name** (`ssh myapi`) — the username routes you to the right container through `localhost:2200`.
 
 ### More examples
 
@@ -159,8 +176,9 @@ extensions, and keeping the `{{PLACEHOLDER}}` tokens intact.
 
 ## Accessing app ports from your browser
 
-Templates publish only the SSH port; app servers (Vite/Next.js on 3000, Spring Boot on 8080)
-stay internal. Reach them with an SSH tunnel — `<project>` is the alias from `~/.ssh/config`:
+Containers publish **no ports** — even SSH goes through the gateway. App servers (Vite/Next.js on
+3000, Spring Boot on 8080) stay internal; reach them with an SSH tunnel over the gateway-routed
+connection — `<project>` is the alias from `~/.ssh/config`:
 
 ```bash
 ssh -fNL 3000:localhost:3000 <project>   # then open http://localhost:3000

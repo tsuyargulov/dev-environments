@@ -14,8 +14,7 @@ Two front-ends share the same templates: the `devenv` CLI and an optional web
 
 ## Runtime directories (created at use time, never committed)
 
-- `~/.devenv/projects/<project>/config.env` — per-project config (port, repo URL, workspace)
-- `~/.devenv/projects/<project>/secrets.env` — tokens; never committed
+- `~/.devenv/projects/<project>/config.env` — per-project config (repo URL, branch, workspace)
 - `~/dev/<project>/` — scaffolded devcontainer config (generated from a template)
 - `~/projects/<project>/` — bind-mounted workspace (the cloned repo lives here)
 
@@ -33,7 +32,12 @@ Two front-ends share the same templates: the `devenv` CLI and an optional web
 
 - **Copy-on-use templates** — `devenv new` copies a template; each project diverges independently.
 - **Bind mount** — `~/projects/<project>` maps to `/workspace`; survives rebuilds.
-- **SSH access** — public key baked in at build via `ARG SSH_PUBKEY`; `sshd` started in `postStartCommand`.
+- **SSH access via a single-port gateway (sshpiper)** — all containers are reached through a
+  reverse proxy on `localhost:2200` that routes by username (`ssh <project>`); containers run
+  `sshd` (started in `postStartCommand`) but publish no port. Their `authorized_keys` trusts the
+  **gateway's** upstream key (baked via `ARG SSH_PUBKEY`); your key + the gateway private key ride
+  as `sshpiper.*` container labels. Managed via `devenv gateway up/down/status`; a
+  docker-socket-proxy gives sshpiper read-only container discovery (no raw socket / no root).
 - **`postStartCommand` handles init** — sshd, git credentials, initial clone — because the
   devcontainer runtime overrides the image ENTRYPOINT.
   - **Exception — `django-bff`** splits the lifecycle as the spec intends: `postCreateCommand`
@@ -55,7 +59,8 @@ Two front-ends share the same templates: the `devenv` CLI and an optional web
 ## Conventions & gotchas (for contributors)
 
 - Templates use these tokens: `{{PROJECT_NAME}}`, `{{GIT_REPO}}`, `{{GIT_BRANCH}}`,
-  `{{SSH_PORT}}`, `{{SSH_PUBKEY}}`, `{{PROJECT_DIR}}`. Never hardcode real values.
+  `{{PROJECT_DIR}}`, `{{GATEWAY_PUBKEY}}` (→ container authorized_keys), and
+  `{{USER_PUBKEY_B64}}` / `{{GATEWAY_PRIVKEY_B64}}` (→ sshpiper labels). Never hardcode real values.
 - Prefer a **prebuilt language image** over a feature that compiles from source (e.g. the python
   feature builds CPython from source on arm64 — slow; the `python` template uses a prebuilt image).
 - Prebuilt Debian devcontainer images ship an expired **yarn apt repo** that breaks
@@ -73,4 +78,5 @@ devenv stop <project>                 # stop container, clean ~/.ssh/config
 devenv ssh <project>                  # open SSH session
 devenv list                           # show projects + running status
 devenv templates                      # list available templates
+devenv gateway up|down|status         # manage the single-port SSH gateway
 ```

@@ -197,7 +197,6 @@ def list_projects():
         projects.append({
             "name": name,
             "template": c.get("TEMPLATE", "?"),
-            "port": c.get("SSH_PORT", "?"),
             "branch": c.get("GIT_BRANCH", ""),
             "repo": c.get("GIT_REPO", ""),
             "workspace": workspace,

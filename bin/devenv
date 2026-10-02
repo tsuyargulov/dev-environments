@@ -20,7 +20,6 @@ require() {
 }
 
 project_cfg()   { echo "$PROJECTS_DIR/$1/config.env"; }
-project_secrets() { echo "$PROJECTS_DIR/$1/secrets.env"; }
 workspace_dir() { echo "$WORKSPACES_DIR/$1"; }
 
 load_config() {
@@ -56,16 +55,6 @@ ssh_config_remove() {
   awk "/^# devenv:$name$/{found=1} found && /^$/{found=0; next} !found" \
     "$HOME/.ssh/config" > "$tmp" 2>/dev/null || true
   mv "$tmp" "$HOME/.ssh/config"
-}
-
-# ── port management ────────────────────────────────────────────────────────
-
-next_free_port() {
-  local port=2222
-  while grep -q "Port $port" "$HOME/.ssh/config" 2>/dev/null; do
-    ((port++))
-  done
-  echo "$port"
 }
 
 # ── commands ───────────────────────────────────────────────────────────────
@@ -159,15 +148,12 @@ WORKSPACE=$workspace
 PROJECT_DIR=$project_dir
 EOF
 
-  touch "$(project_secrets "$project")"
-
   echo
   info "Created project '$project'"
   echo "  template : $template"
   echo "  workspace: $workspace"
   echo "  ssh      : ssh $project   (via gateway :2200)"
   echo
-  echo "Add secrets: $PROJECTS_DIR/$project/secrets.env"
   echo "Then run:    devenv start $project"
 }
 

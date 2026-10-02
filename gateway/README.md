@@ -1,42 +1,55 @@
-# gateway (sshpiper) — increment 1: routing validation
+# gateway — single-port SSH reverse proxy (sshpiper)
 
-Goal: prove the single-port SSH gateway works on this host **before** refactoring devenv/
-templates. Stands up sshpiper + one throwaway target and routes `ssh test@host:2200` into it.
+Every devcontainer is reached through **one** SSH gateway on `localhost:2200` instead of a
+published port per container. sshpiper routes by the **username** of the connection:
+`ssh <project>` → the container labelled `sshpiper.username=<project>`.
 
-## Run
+Managed by the CLI:
 
 ```bash
-cd gateway
-./setup.sh                 # generates the gateway keypair + .env from your ~/.ssh/id_ed25519.pub
-docker compose up -d       # sshpiper on :2200 + a throwaway target, both on devenv-net
+devenv gateway up        # start sshpiper + docker-socket-proxy (+ create the devenv-net network)
+devenv gateway status
+devenv gateway down
 ```
 
-## Validate
+`devenv start <project>` brings the gateway up automatically and writes a `~/.ssh/config` entry
+(`Host <project>` → `localhost:2200`, `User <project>`), so you just `ssh <project>`.
+
+## Routing + auth (two legs)
+
+```
+you ──(your key, downstream)──▶ sshpiper :2200 ──(gateway key, upstream)──▶ container sshd
+     verified via sshpiper.authorized_keys label   routed by sshpiper.username=<project>
+```
+
+- **Downstream** (you → sshpiper): your public key, carried in the container's
+  `sshpiper.authorized_keys` label, authenticates you.
+- **Upstream** (sshpiper → container): sshpiper logs in as `vscode` using the **gateway keypair**;
+  the container's `authorized_keys` trusts the gateway's public key.
+- devenv stamps each project's container with the `sshpiper.*` labels and joins it to `devenv-net`.
+
+## Security
+
+sshpiper never touches the raw Docker socket or runs as root. A **docker-socket-proxy** holds the
+socket and exposes only read-only container listing (`CONTAINERS=1`) over an internal TCP API, so
+even a compromised sshpiper can't create or exec containers. The raw-socket power is concentrated
+in that tiny, non-exposed proxy. (Production hardening beyond this — rootless Docker/Podman, or
+Kubernetes RBAC — would remove the "socket = host root" exposure entirely.)
+
+> **Not for internet exposure as-is.** This posture is for a local, single-user machine.
+
+## Files
+
+- `compose.yml` — `sshpiper` + `docker-socket-proxy` (plus a `validation`-profile throwaway target)
+- `setup.sh`, `.env`, `keys/` — the local gateway keypair (generated; gitignored)
+
+## Standalone routing check (optional)
+
+Re-validate routing without any devcontainer, using the throwaway target behind the `validation`
+profile:
 
 ```bash
+./setup.sh && docker compose --profile validation up -d
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null test@localhost -p 2200 'echo OK; hostname'
+docker compose --profile validation down
 ```
-
-Success = you land in the **target** container (prints `OK` + the container's hostname). That
-exercises the whole chain:
-
-```
-you ──(your key, downstream)──▶ sshpiper :2200 ──(gateway key, upstream)──▶ test-target sshd
-     verified via the container's sshpiper.authorized_keys label
-                                  routed by sshpiper.username=test
-```
-
-## Teardown
-
-```bash
-docker compose down
-```
-
-## What this validates (the 4 unknowns)
-- docker-plugin **username→container routing** (via labels)
-- **two-leg auth** (your key downstream, gateway key upstream)
-- **network reachability** (sshpiper → container over `devenv-net`)
-- host-key handling
-
-Once green, the next increment refactors the devenv templates to produce containers shaped like
-`test-target` (labels + `devenv-net`, trusting the gateway key), and drops their published SSH port.
