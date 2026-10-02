@@ -181,7 +181,18 @@ demonstrates an auth flow: sign in via a local **Keycloak** (an IdP stand-in), t
 temporary **AWS STS** credentials against **LocalStack** via `assume-role-with-web-identity`.
 
 It runs on the host (it needs Docker and the `~/.devenv` tree) alongside Keycloak and LocalStack
-as sibling containers. See **[factory-ui/README.md](factory-ui/README.md)** to run it.
+as sibling containers.
+
+Quick start (the factory panel on its own — no auth):
+
+```bash
+cd factory-ui
+uv venv && uv pip install flask     # Flask is the only dependency
+.venv/bin/python app.py             # → http://localhost:5001
+```
+
+For the optional Keycloak sign-in + AWS STS demo (and full details), see
+**[factory-ui/README.md](factory-ui/README.md)**.
 
 ---
 
