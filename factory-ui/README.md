@@ -35,7 +35,7 @@ own. LocalStack (for the STS panel) is expected as a separate host sibling on `:
 | `index.html` / `login.html` / `logs.html` | UI pages |
 | `docker-compose.yml` | Keycloak (IdP mock) |
 | `setup_keycloak.sh` | idempotent realm/client/user bootstrap |
-| `themes/qbank/` | branded Keycloak login theme |
+| `themes/devenv/` | branded Keycloak login theme |
 
 ## Not committed (secrets)
 

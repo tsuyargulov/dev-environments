@@ -1,32 +1,32 @@
-/* Qbank — minimal orange login theme (overrides on top of the classic keycloak theme).
+/* devenv — minimal orange login theme (overrides on top of the classic keycloak theme).
    Selectors target the classic theme; a few PatternFly fallbacks are included harmlessly. */
 :root{
-  --qbank-orange:#E8710A;
-  --qbank-orange-deep:#C25E00;
-  --qbank-bg:#FFF6EC;
-  --qbank-ink:#2A2018;
+  --brand-orange:#E8710A;
+  --brand-orange-deep:#C25E00;
+  --brand-bg:#FFF6EC;
+  --brand-ink:#2A2018;
 }
 
 html,
 body.login-pf,
 .login-pf body,
 .login-pf-page{
-  background: radial-gradient(1100px 520px at 50% -12%, #FFE7CE, var(--qbank-bg)) !important;
-  color: var(--qbank-ink) !important;
+  background: radial-gradient(1100px 520px at 50% -12%, #FFE7CE, var(--brand-bg)) !important;
+  color: var(--brand-ink) !important;
 }
 
 /* login card */
 .card-pf,
 .pf-v5-c-login__main{
-  border-top: 4px solid var(--qbank-orange) !important;
+  border-top: 4px solid var(--brand-orange) !important;
   border-radius: 12px !important;
   box-shadow: 0 18px 50px rgba(120,60,0,.14) !important;
 }
 
-/* header: realm displayName ("Qbank") + orange-slice logo above it */
+/* header: realm displayName ("devenv") + orange-slice logo above it */
 #kc-header,
 #kc-header-wrapper{
-  color: var(--qbank-orange-deep) !important;
+  color: var(--brand-orange-deep) !important;
   font-weight: 700 !important;
   font-size: 1.7rem !important;
   letter-spacing: -.01em;
@@ -44,16 +44,16 @@ input[type="submit"],
 .btn-primary,
 .pf-v5-c-button.pf-m-primary,
 .pf-c-button.pf-m-primary{
-  background: var(--qbank-orange) !important;
-  border-color: var(--qbank-orange) !important;
+  background: var(--brand-orange) !important;
+  border-color: var(--brand-orange) !important;
   color:#fff !important;
 }
 input[type="submit"]:hover,
 .btn-primary:hover,
 .pf-v5-c-button.pf-m-primary:hover,
 .pf-c-button.pf-m-primary:hover{
-  background: var(--qbank-orange-deep) !important;
-  border-color: var(--qbank-orange-deep) !important;
+  background: var(--brand-orange-deep) !important;
+  border-color: var(--brand-orange-deep) !important;
 }
 
 /* inputs + links */
@@ -61,7 +61,7 @@ input[type="text"], input[type="password"], input[type="email"]{
   border-radius:8px !important;
 }
 input:focus{
-  border-color: var(--qbank-orange) !important;
+  border-color: var(--brand-orange) !important;
   box-shadow: 0 0 0 2px rgba(232,113,10,.25) !important;
 }
-a{ color: var(--qbank-orange-deep) !important; }
+a{ color: var(--brand-orange-deep) !important; }

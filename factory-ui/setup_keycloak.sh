@@ -48,9 +48,9 @@ else
 fi
 
 # 2b. realm branding: display name (shown on the login form) + custom login theme
-info "applying branding (displayName=Qbank, loginTheme=qbank)"
+info "applying branding (displayName=devenv factory, loginTheme=devenv)"
 curl -s "${AUTH[@]}" -X PUT "$KC/admin/realms/$REALM" -H "Content-Type: application/json" \
-  -d "{\"realm\":\"$REALM\",\"displayName\":\"Qbank\",\"displayNameHtml\":\"<b>Qbank</b>\",\"loginTheme\":\"qbank\"}" >/dev/null
+  -d "{\"realm\":\"$REALM\",\"displayName\":\"devenv factory\",\"displayNameHtml\":\"<b>devenv factory</b>\",\"loginTheme\":\"devenv\"}" >/dev/null
 
 # 3. client (confidential, standard/auth-code flow)
 CLIENT_UUID=$(curl -s "${AUTH[@]}" "$KC/admin/realms/$REALM/clients?clientId=$CLIENT" \

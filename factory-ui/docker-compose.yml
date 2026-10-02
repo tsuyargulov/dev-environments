@@ -22,11 +22,11 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       # Health/metrics endpoints on the management port (9000) — used to check readiness.
       KC_HEALTH_ENABLED: "true"
-      # Dev only: don't cache themes/templates so Qbank theme edits show on refresh.
+      # Dev only: don't cache themes/templates so devenv theme edits show on refresh.
       KC_SPI_THEME_CACHE_THEMES: "false"
       KC_SPI_THEME_CACHE_TEMPLATES: "false"
     volumes:
-      - ./themes/qbank:/opt/keycloak/themes/qbank
+      - ./themes/devenv:/opt/keycloak/themes/devenv
     ports:
       - "8080:8080"   # HTTP (console + OIDC endpoints)
       - "9000:9000"   # management (health/ready, metrics)
