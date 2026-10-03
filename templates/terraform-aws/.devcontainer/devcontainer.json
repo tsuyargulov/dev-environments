@@ -13,6 +13,7 @@
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/terraform:1": {
+      "version": "latest",
       "tflint": "latest",
       "terragrunt": "latest",
       "installTerraformDocs": "latest"
