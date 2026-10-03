@@ -44,6 +44,7 @@ Host $name
     Port 2200
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
+    LogLevel ERROR
 EOF
   info "~/.ssh/config: added Host $name → gateway :2200 (user $name)"
 }
@@ -158,8 +159,14 @@ EOF
 }
 
 cmd_start() {
-  local project="${1:-}"
-  [[ -n "$project" ]] || die "usage: devenv start <project>"
+  local project="" rebuild=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --rebuild) rebuild=1; shift ;;
+      *)         project="$1"; shift ;;
+    esac
+  done
+  [[ -n "$project" ]] || die "usage: devenv start <project> [--rebuild]"
   load_config "$project"
 
   require devcontainer
@@ -167,11 +174,22 @@ cmd_start() {
   info "ensuring gateway is up..."
   ensure_gateway_running
 
-  info "Starting '$project'..."
-
-  devcontainer up \
-    --workspace-folder "$WORKSPACE" \
-    --log-format text
+  # Without --rebuild, `devcontainer up` reuses the existing image AND container,
+  # so feature tool versions and devcontainer.json edits silently don't take effect.
+  # --rebuild forces a clean image (no cache) and a fresh container.
+  if [[ $rebuild -eq 1 ]]; then
+    info "Rebuilding '$project' (no cache, fresh container)..."
+    devcontainer up \
+      --workspace-folder "$WORKSPACE" \
+      --log-format text \
+      --build-no-cache \
+      --remove-existing-container
+  else
+    info "Starting '$project'..."
+    devcontainer up \
+      --workspace-folder "$WORKSPACE" \
+      --log-format text
+  fi
 
   ssh_config_add "$project"
 
@@ -220,7 +238,7 @@ cmd_list() {
     # shellcheck source=/dev/null
     set -a; source "$cfg"; set +a
     local status="stopped"
-    docker ps --format '{{.Names}}' 2>/dev/null | grep -q "$PROJECT_NAME" && status="running"
+    docker ps -q --filter "label=sshpiper.username=$PROJECT_NAME" 2>/dev/null | grep -q . && status="running"
     printf "%-22s %-8s %-10s %s\n" "$PROJECT_NAME" "$SSH_PORT" "$status" "$TEMPLATE"
   done
 
@@ -273,7 +291,7 @@ require docker
 
 case "${1:-}" in
   new)       shift; cmd_new "$@" ;;
-  start)     shift; cmd_start "${1:-}" ;;
+  start)     shift; cmd_start "$@" ;;
   stop)      shift; cmd_stop "${1:-}" ;;
   ssh)       shift; cmd_ssh "${1:-}" ;;
   list)      cmd_list ;;
@@ -285,7 +303,7 @@ Usage: devenv <command> [args]
 
 Commands:
   new <project> --template <t>   scaffold a new project from a template
-  start <project>                build and start the dev container
+  start <project> [--rebuild]    build and start the dev container (--rebuild: no-cache, fresh container)
   stop <project>                 stop and remove the container
   ssh <project>                  open an SSH session
   list                           show all projects and their status
